@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora IA Multimodal - by kyvcz</title>
+    
+    <script type="module">
+        import { GoogleGenAI } from 'https://cdn.jsdelivr.net/npm/@google/genai';
+        window.GoogleGenAI = GoogleGenAI; // Hacemos la clase accesible globalmente
+    </script>
+    
+    <style>
+        /* Variables y Reset Básico (Estilo ALEKS) */
+        :root {
+            --aleks-blue: #007bff;
+            --aleks-light-gray: #f8f9fa;
+            --aleks-dark-gray: #343a40;
+            --font-stack: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body { 
+            font-family: var(--font-stack); 
+            margin: 0; 
+            background: var(--aleks-light-gray); 
+            display: flex; 
+            flex-direction: column; 
+            height: 100vh;
+        }
+
+        /* Encabezado */
+        .header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+            padding: 10px 20px; 
+            background: white; 
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            color: var(--aleks-dark-gray);
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            color: var(--aleks-blue);
+        }
+        .header button {
+            background: var(--aleks-blue);
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .header button:hover {
+            background: #0056b3;
+        }
+
+        /* Contenedor del Chat */
+        #chat-container { 
+            flex-grow: 1; 
+            overflow-y: auto; 
+            padding: 20px; 
+            background: white; 
+            max-width: 800px;
+            width: 100%;
+            margin: 20px auto 0;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+        }
+        
+        /* Área de Entrada */
+        #input-area { 
+            padding: 20px; 
+            background: white; 
+            border-top: 1px solid #ccc; 
+            box-sizing: border-box; 
+        }
+        #input-wrapper {
+            max-width: 800px;
+            width: 100%;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+        }
+        #prompt-input { 
+            flex-grow: 1; 
+            padding: 12px; 
+            margin-right: 10px; 
+            border: 1px solid #ccc; 
+            border-radius: 4px; 
+            font-size: 1rem;
+        }
+        #input-area button {
+            background: var(--aleks-blue);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        /* Previsualización de Imagen */
+        #image-preview { 
+            max-width: 80px; 
+            max-height: 80px; 
+            margin-right: 15px; 
+            border-radius: 4px; 
+            border: 2px solid var(--aleks-blue); 
+            display: none; 
+            object-fit: cover;
+        }
+
+        /* Mensajes del Chat */
+        .message { 
+            margin-bottom: 15px; 
+            padding: 10px 15px; 
+            border-radius: 18px; 
+            max-width: 80%; 
+            line-height: 1.4;
+            box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+            white-space: pre-wrap; /* Mantiene saltos de línea y formato */
+        }
+        .user { 
+            background: #e2f4ff; 
+            margin-left: auto; 
+            text-align: right; 
+            border-bottom-right-radius: 2px;
+        }
+        .ai { 
+            background: white; 
+            border: 1px solid #ddd; 
+            text-align: left; 
+            border-bottom-left-radius: 2px;
+        }
+        .warning {
+            color: #d9534f;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        /* Estilos de Perspectiva Oculta */
+        .perspective-hidden { 
+            background: #000; 
+            color: #ff0000; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            flex-direction: column; 
+            height: 100vh; 
+            width: 100vw; 
+            position: fixed; /* Usar fixed para cubrir toda la ventana */
+            top: 0; 
+            left: 0; 
+            z-index: 9999; 
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Calculadora IA by kyvcz</h1>
+        <div>
+            <button onclick="togglePerspective()">Ocultar Perspectiva</button>
+            <button onclick="togglePerspective()" style="margin-left: 10px;">Salir de Perspectiva</button>
+        </div>
+    </div>
+
+    <div id="chat-container">
+        <div class="message ai">¡Hola! Soy tu asistente de IA multimodal. Puedes pegarme (Ctrl+V) o arrastrar una imagen y preguntarme algo sobre ella.</div>
+        <div class="message warning">
+            ⚠️ ADVERTENCIA CRÍTICA: Tu API Key se está usando directamente en este código. EXTREMADAMENTE INSEGURO. Úsalo solo para pruebas rápidas.
+        </div>
+    </div>
+
+    <div id="input-area">
+        <div id="input-wrapper">
+            <img id="image-preview" src="" alt="Vista previa de imagen" />
+            <input type="text" id="prompt-input" placeholder="Escribe tu pregunta en español y/o pega tu imagen..." />
+            <button onclick="sendMessage()">Enviar</button>
+        </div>
+    </div>
+
+    <div id="perspective-view" class="perspective-hidden" style="display: none;">
+        <h1>404 Not found</h1>
+        <p>Parece que has encontrado un lugar oculto. Por favor, sal para continuar con la Calculadora IA.</p>
+        <button onclick="togglePerspective()">Salir de Perspectiva</button>
+    </div>
+
+    <script type="module">
+        // 🛑 PELIGRO: API Key expuesta
+        const API_KEY = "AIzaSyCd7JuDnw7G5-fCe7SJCGewt5FsIlBJGI4";
+        
+        // Inicializa el cliente de la API
+        let ai;
+        try {
+            if (window.GoogleGenAI) {
+                ai = new window.GoogleGenAI({ apiKey: API_KEY });
+            } else {
+                throw new Error("SDK de Google GenAI no cargado.");
+            }
+        } catch (e) {
+            console.error("Error al inicializar la IA:", e);
+            document.getElementById('chat-container').innerHTML += `<div class="message warning">Error al cargar la IA: ${e.message}</div>`;
+        }
+
+        let uploadedImage = null; // Almacena la imagen en Base64
+        const chatContainer = document.getElementById('chat-container');
+        const imagePreview = document.getElementById('image-preview');
+        const perspectiveView = document.getElementById('perspective-view');
+
+        // --- 1. Manejo de la Perspectiva Secreta ---
+        function togglePerspective() {
+            const isHidden = perspectiveView.style.display !== 'none';
+            perspectiveView.style.display = isHidden ? 'none' : 'flex';
+        }
+        window.togglePerspective = togglePerspective; // Hace la función accesible desde el onclick en HTML
+        
+        // --- 2. Funcionalidad de Chat y API (Real) ---
+        function appendMessage(text, sender) {
+            const msgDiv = document.createElement('div');
+            msgDiv.classList.add('message', sender);
+            msgDiv.textContent = text;
+            chatContainer.appendChild(msgDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            return msgDiv;
+        }
+
+        // Helper para crear el objeto de contenido de imagen
+        function getPartFromBase64(base64Data) {
+            const [mimePart, dataPart] = base64Data.split(',');
+            const mimeType = mimePart.match(/:(.*?);/)?.[1] || 'image/jpeg';
+            return {
+                inlineData: {
+                    data: dataPart,
+                    mimeType: mimeType
+                }
+            };
+        }
+
+        async function sendMessage() {
+            if (!ai) {
+                appendMessage("La IA no está inicializada debido a un error de carga.", 'ai');
+                return;
+            }
+
+            const promptInput = document.getElementById('prompt-input');
+            const prompt = promptInput.value.trim();
+            
+            if (!prompt && !uploadedImage) return;
+
+            // Mostrar mensaje del usuario
+            let userMessage = prompt;
+            if (uploadedImage) {
+                userMessage += prompt ? " (Adjunto: Imagen)" : "Solo Imagen adjunta";
+            }
+            appendMessage(userMessage, 'user');
+            
+            const loadingMessage = appendMessage("Procesando... ⏳", 'ai'); // Mensaje de carga
+
+            try {
+                const contents = [];
+                
+                // 1. Añadir la imagen si existe
+                if (uploadedImage) {
+                    contents.push(getPartFromBase64(uploadedImage));
+                }
+
+                // 2. Añadir el prompt (texto)
+                if (prompt) {
+                    contents.push({ text: prompt });
+                }
+
+                const response = await ai.models.generateContent({
+                    model: 'gemini-2.5-flash',
+                    contents: contents,
+                    config: {
+                        systemInstruction: "Eres un asistente de IA experto en matemáticas y análisis de imágenes. Responde siempre de forma clara y concisa en español.",
+                    }
+                });
+
+                // Reemplazar el mensaje de carga con la respuesta real
+                loadingMessage.textContent = response.text;
+                loadingMessage.classList.remove('warning');
+                
+            } catch (error) {
+                console.error("Error al llamar a la API:", error);
+                loadingMessage.textContent = `❌ Error al procesar: ${error.message}. Verifica tu API Key.`;
+                loadingMessage.classList.add('warning');
+            }
+            
+            // Limpiar la entrada y la imagen
+            promptInput.value = '';
+            uploadedImage = null;
+            imagePreview.style.display = 'none';
+            imagePreview.src = '';
+
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+        window.sendMessage = sendMessage; // Hace la función accesible desde el onclick en HTML
+
+
+        // --- 3. Manejo de Imágenes (Ctrl+V y Arrastrar/Soltar) ---
+
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = error => reject(error);
+            });
+        }
+
+        async function processImageFile(file) {
+            if (!file || !file.type.startsWith('image/')) {
+                 appendMessage(`⚠️ Solo se aceptan imágenes.`, 'ai');
+                 return;
+            }
+            if (!ai) {
+                 appendMessage(`⚠️ No se puede cargar la imagen. La IA no está inicializada.`, 'ai');
+                 return;
+            }
+            uploadedImage = await fileToBase64(file);
+            imagePreview.src = uploadedImage;
+            imagePreview.style.display = 'block';
+            appendMessage(`✅ Imagen de ${file.name} lista. Ahora, haz tu pregunta en el campo de texto y haz clic en "Enviar".`, 'ai');
+        }
+        
+        // Evento para PEGADO (Ctrl+V)
+        document.addEventListener('paste', async (e) => {
+            const items = e.clipboardData.items;
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                    e.preventDefault(); 
+                    const file = items[i].getAsFile();
+                    await processImageFile(file);
+                    return;
+                }
+            }
+        });
+
+        // Eventos para ARRASTRAR/SOLTAR (Drag and Drop)
+        document.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+        document.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                await processImageFile(files[0]);
+            }
+        });
+    </script>
+</body>
+</html>
